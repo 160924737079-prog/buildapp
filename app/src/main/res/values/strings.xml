@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">ExpensePro AI</string>
+    <string name="tagline">Smart Personal &amp; Family Expense Analytics</string>
+    <string name="dashboard_title">Financial Overview</string>
+    <string name="quick_add_title">Quick Add Expense</string>
+    <string name="history_title">Transaction History</string>
+    <string name="categories_title">Expense Categories</string>
+    <string name="budgets_title">Budget Management</string>
+    <string name="recurring_title">Recurring Expenses</string>
+    <string name="reports_title">Reports &amp; Analytics</string>
+    <string name="ai_insights_title">AI Financial Insights</string>
+    <string name="profile_title">Profile &amp; Settings</string>
+    <string name="exports_title">Export &amp; Account</string>
+</resources>

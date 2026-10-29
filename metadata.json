@@ -1,0 +1,6 @@
+{
+  "name": "ExpensePro AI",
+  "description": "Smart personal and family expense tracker with Supabase PostgreSQL sync, 10 interactive charts, budget alerts, recurring expenses, CSV/XLSX/PDF exports, and optional AI insights.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
