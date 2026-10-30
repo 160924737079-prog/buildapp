@@ -90,13 +90,15 @@ data class ExpenseProUiState(
     val lastGeneratedExport: GeneratedExportFile? = null,
     val isBuildingApk: Boolean = false,
     val apkBuildStepMessage: String? = null,
-    val apkBuildArtifact: ApkBuildArtifact? = null
+    val apkBuildArtifact: ApkBuildArtifact? = null,
+    val themePreferenceOverride: ThemePreference? = null
 ) {
     val currencyCode: String get() = profile?.preferredCurrency ?: "INR"
     val dateFormatPattern: String get() = profile?.dateFormat ?: "dd MMM yyyy"
     val themePreference: ThemePreference
-        get() = runCatching { ThemePreference.valueOf(profile?.themeMode ?: "LIGHT") }
-            .getOrDefault(ThemePreference.LIGHT)
+        get() = themePreferenceOverride
+            ?: runCatching { ThemePreference.valueOf(profile?.themeMode ?: "LIGHT") }
+                .getOrDefault(ThemePreference.LIGHT)
 }
 
 class ExpenseProViewModel(
@@ -686,6 +688,31 @@ class ExpenseProViewModel(
     }
 
     // Profile & Settings
+    fun setThemeMode(themePreference: ThemePreference) {
+        val currentProfile = _uiState.value.profile
+        _uiState.update { state ->
+            state.copy(
+                themePreferenceOverride = themePreference,
+                profile = currentProfile?.copy(themeMode = themePreference.name),
+                statusBannerMessage = "Switched to ${themePreference.label} Mode"
+            )
+        }
+        if (currentProfile != null) {
+            viewModelScope.launch {
+                repository.updateProfile(currentProfile.copy(themeMode = themePreference.name))
+            }
+        }
+    }
+
+    fun toggleDarkLightTheme() {
+        val nextTheme = if (_uiState.value.themePreference == ThemePreference.DARK) {
+            ThemePreference.LIGHT
+        } else {
+            ThemePreference.DARK
+        }
+        setThemeMode(nextTheme)
+    }
+
     fun updateProfilePreferences(
         fullName: String,
         preferredCurrency: String,
@@ -695,6 +722,8 @@ class ExpenseProViewModel(
         aiConsentGranted: Boolean,
         aiEnabled: Boolean
     ) {
+        val prefEnum = runCatching { ThemePreference.valueOf(themeMode) }.getOrDefault(ThemePreference.LIGHT)
+        _uiState.update { it.copy(themePreferenceOverride = prefEnum) }
         val current = _uiState.value.profile ?: return
         viewModelScope.launch {
             val updated = current.copy(

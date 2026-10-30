@@ -34,9 +34,11 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Savings
@@ -77,6 +79,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.Room
 import com.example.data.ExpenseProDatabase
 import com.example.data.ExpenseProRepository
+import com.example.domain.ThemePreference
 import com.example.ui.AppPage
 import com.example.ui.ExpenseProUiState
 import com.example.ui.ExpenseProViewModel
@@ -206,6 +209,24 @@ fun ExpenseProAppRoot(
                                 modifier = Modifier.testTag("drawer_nav_${item.page.name.lowercase()}")
                             )
                         }
+
+                        val isDarkActive = uiState.themePreference == ThemePreference.DARK
+                        NavigationDrawerItem(
+                            label = { Text(if (isDarkActive) "Switch to Light Mode" else "Switch to Dark Mode") },
+                            icon = {
+                                Icon(
+                                    imageVector = if (isDarkActive) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                    contentDescription = "Toggle Dark or Light Mode",
+                                    tint = Emerald500
+                                )
+                            },
+                            selected = false,
+                            onClick = {
+                                viewModel.toggleDarkLightTheme()
+                                scope.launch { drawerState.close() }
+                            },
+                            modifier = Modifier.testTag("drawer_theme_toggle_item")
+                        )
                     }
                 }
             }
@@ -263,6 +284,17 @@ fun ExpenseProAppRoot(
                             }
                         },
                         actions = {
+                            val isDarkActive = uiState.themePreference == ThemePreference.DARK
+                            IconButton(
+                                onClick = { viewModel.toggleDarkLightTheme() },
+                                modifier = Modifier.testTag("top_bar_theme_toggle_button")
+                            ) {
+                                Icon(
+                                    imageVector = if (isDarkActive) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                    contentDescription = if (isDarkActive) "Switch to Light Mode" else "Switch to Dark Mode",
+                                    tint = if (isDarkActive) Color(0xFFFBBF24) else Color.White
+                                )
+                            }
                             IconButton(
                                 onClick = { viewModel.navigateTo(AppPage.REPORTS) },
                                 modifier = Modifier.testTag("top_bar_visualizations_button")

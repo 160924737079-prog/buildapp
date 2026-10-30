@@ -21,7 +21,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -61,6 +63,7 @@ import com.example.domain.DateRangeEngine
 import com.example.domain.FinancialCalculator
 import com.example.domain.MoneyUtils
 import com.example.domain.PaymentMethod
+import com.example.domain.ThemePreference
 import com.example.ui.AppPage
 import com.example.ui.ExpenseProUiState
 import com.example.ui.ExpenseProViewModel
@@ -168,6 +171,69 @@ fun DashboardScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // 0. Quick Light Mode / Dark Mode Switcher Bar
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val isDark = uiState.themePreference == ThemePreference.DARK
+                    Icon(
+                        imageVector = if (isDark) Icons.Default.DarkMode else Icons.Default.LightMode,
+                        contentDescription = null,
+                        tint = if (isDark) Color(0xFFFBBF24) else Emerald600,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "Appearance Mode",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = uiState.themePreference == ThemePreference.LIGHT,
+                        onClick = { viewModel.setThemeMode(ThemePreference.LIGHT) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.LightMode,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        label = { Text("Light Mode") },
+                        modifier = Modifier.testTag("dashboard_light_mode_chip")
+                    )
+                    FilterChip(
+                        selected = uiState.themePreference == ThemePreference.DARK,
+                        onClick = { viewModel.setThemeMode(ThemePreference.DARK) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.DarkMode,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        label = { Text("Dark Mode") },
+                        modifier = Modifier.testTag("dashboard_dark_mode_chip")
+                    )
+                }
+            }
+        }
+
         // 1. Live Date Selector & Clean Totals Header
         Card(
             modifier = Modifier.fillMaxWidth(),

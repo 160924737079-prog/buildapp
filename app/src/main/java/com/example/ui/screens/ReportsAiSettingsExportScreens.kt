@@ -787,13 +787,17 @@ fun ProfileAndSettingsScreen(
                     }
                 }
 
-                Text("Appearance Theme", style = MaterialTheme.typography.labelLarge)
+                Text("Appearance Theme (Dark Mode / Light Mode)", style = MaterialTheme.typography.labelLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ThemePreference.entries.forEach { tp ->
                         FilterChip(
-                            selected = themeMode == tp.name,
-                            onClick = { themeMode = tp.name },
-                            label = { Text(tp.label) }
+                            selected = uiState.themePreference == tp,
+                            onClick = {
+                                themeMode = tp.name
+                                viewModel.setThemeMode(tp)
+                            },
+                            label = { Text(tp.label) },
+                            modifier = Modifier.testTag("settings_theme_chip_${tp.name.lowercase()}")
                         )
                     }
                 }
