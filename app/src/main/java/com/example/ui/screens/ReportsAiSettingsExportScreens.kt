@@ -99,16 +99,21 @@ fun ReportsAndAnalyticsScreen(
     val currency = uiState.currencyCode
     var activeTab by remember { mutableStateOf(ReportTab.MONTHLY) }
 
-    // Navigation states for sections 9, 10, 11
-    var selectedDateIso by remember { mutableStateOf(uiState.referenceDateIso) }
-    var selectedYear by remember { mutableIntStateOf(2026) }
-    var selectedMonth by remember { mutableIntStateOf(10) }
-    var selectedQuarter by remember { mutableIntStateOf(4) }
-    var selectedHalf by remember { mutableIntStateOf(2) }
+    val refParts = uiState.referenceDateIso.split("-")
+    val initialYear = refParts.getOrNull(0)?.toIntOrNull() ?: 2026
+    val initialMonth = refParts.getOrNull(1)?.toIntOrNull() ?: 10
 
-    // Custom Filter Report states (Section 11)
-    var customStart by remember { mutableStateOf("2026-01-01") }
-    var customEnd by remember { mutableStateOf("2026-10-31") }
+    var selectedDateIso by remember(uiState.referenceDateIso) { mutableStateOf(uiState.referenceDateIso) }
+    var selectedYear by remember(initialYear) { mutableIntStateOf(initialYear) }
+    var selectedMonth by remember(initialMonth) { mutableIntStateOf(initialMonth) }
+    var selectedQuarter by remember(initialMonth) { mutableIntStateOf(((initialMonth - 1) / 3) + 1) }
+    var selectedHalf by remember(initialMonth) { mutableIntStateOf(if (initialMonth <= 6) 1 else 2) }
+
+    // Custom Filter Report states
+    var customStart by remember(initialYear, initialMonth) {
+        mutableStateOf(String.format("%04d-%02d-01", initialYear, initialMonth))
+    }
+    var customEnd by remember(uiState.referenceDateIso) { mutableStateOf(uiState.referenceDateIso) }
     var selectedCustomCatIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selectedCustomPayMethods by remember { mutableStateOf<Set<String>>(emptySet()) }
     var customMinAmt by remember { mutableStateOf("") }
@@ -411,16 +416,7 @@ fun ReportsAndAnalyticsScreen(
                             color = Emerald600
                         )
                     }
-                    Column {
-                        Text("Avg Daily", style = MaterialTheme.typography.labelSmall)
-                        Text(
-                            text = MoneyUtils.formatMoney(report.averageDailyMinor, currency),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontFamily = JetBrainsMonoFamily,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    Column {
+                    Column(horizontalAlignment = Alignment.End) {
                         Text("Transactions", style = MaterialTheme.typography.labelSmall)
                         Text(
                             text = "${report.transactionCount}",
@@ -753,12 +749,12 @@ fun ProfileAndSettingsScreen(
         ) {
             Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "User Profile & Regional Preferences",
+                    text = "Tracker Preferences & Regional Settings",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Signed in as: ${profile?.email ?: "alex.morgan@expensepro.ai"} • Backend: ${if (uiState.isSupabaseConfigured) "Supabase Cloud PostgreSQL + RLS" else "Local Room SQLite + RLS Isolation"}",
+                    text = "Local SQLite Database • Direct Expense Tracking & Visualizations (No Login Required)",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -766,7 +762,7 @@ fun ProfileAndSettingsScreen(
                 OutlinedTextField(
                     value = fullName,
                     onValueChange = { fullName = it },
-                    label = { Text("Full Name") },
+                    label = { Text("Display Name") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -830,14 +826,25 @@ fun ProfileAndSettingsScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
                     modifier = Modifier.fillMaxWidth().height(48.dp).testTag("save_profile_button")
                 ) {
-                    Text("Save Profile & Preferences", fontWeight = FontWeight.Bold)
+                    Text("Save Preferences", fontWeight = FontWeight.Bold)
                 }
 
-                OutlinedButton(
-                    onClick = { viewModel.logout() },
-                    modifier = Modifier.fillMaxWidth().testTag("logout_button")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Sign Out")
+                    OutlinedButton(
+                        onClick = { viewModel.restoreSampleExpenses() },
+                        modifier = Modifier.weight(1f).testTag("settings_restore_sample_button")
+                    ) {
+                        Text("Restore Sample Data")
+                    }
+                    OutlinedButton(
+                        onClick = { viewModel.clearAllExpenses() },
+                        modifier = Modifier.weight(1f).testTag("settings_clear_expenses_button")
+                    ) {
+                        Text("Clear All Expenses", color = AlertRed600)
+                    }
                 }
             }
         }
@@ -1133,7 +1140,7 @@ fun ExportAndAccountScreen(
             }
         }
 
-        // Security, Privacy & Account Deletion Section (Section 19)
+        // Local Data Management Section
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -1141,22 +1148,28 @@ fun ExportAndAccountScreen(
         ) {
             Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "Security, Privacy & Account Management",
+                    text = "Local Expense Data Management",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "• Row Level Security (RLS): Every query is strictly scoped to your authenticated user_id.\n• Zero Privileged Credentials: Service-role keys are never stored in client code.\n• Password Protection: Credentials are salted and SHA-256 / Supabase Auth hashed.",
+                    text = "Manage your local expense records. You can restore sample transactions to preview all 10 interactive charts or clear all expenses to start fresh.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 OutlinedButton(
+                    onClick = { viewModel.restoreSampleExpenses() },
+                    modifier = Modifier.fillMaxWidth().testTag("restore_sample_expenses_button")
+                ) {
+                    Text("Restore Sample Expenses for Visualizations")
+                }
+                OutlinedButton(
                     onClick = { showDeleteAccountModal = true },
-                    modifier = Modifier.fillMaxWidth().testTag("delete_account_button")
+                    modifier = Modifier.fillMaxWidth().testTag("clear_all_expenses_button")
                 ) {
                     Icon(Icons.Default.DeleteForever, contentDescription = null, tint = AlertRed600)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Delete Account & Wipe All Financial Data", color = AlertRed600)
+                    Text("Clear All Expenses (Start Fresh)", color = AlertRed600)
                 }
             }
         }
@@ -1165,19 +1178,19 @@ fun ExportAndAccountScreen(
     if (showDeleteAccountModal) {
         AlertDialog(
             onDismissRequest = { showDeleteAccountModal = false },
-            title = { Text("Permanently Delete Account?") },
+            title = { Text("Clear All Expenses?") },
             text = {
-                Text("This will permanently erase your profile, expenses, custom categories, budgets, and recurring schedules. This action cannot be undone.")
+                Text("This will clear all recorded expenses from your local database while keeping your categories and preferences intact.")
             },
             confirmButton = {
                 Button(
                     onClick = {
                         showDeleteAccountModal = false
-                        viewModel.deleteCurrentAccount()
+                        viewModel.clearAllExpenses()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = AlertRed600)
                 ) {
-                    Text("Delete Everything")
+                    Text("Clear All Expenses")
                 }
             },
             dismissButton = {

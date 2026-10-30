@@ -39,38 +39,50 @@ import java.io.File
 import java.util.UUID
 
 enum class AppPage(val title: String) {
-    LANDING("Welcome to ExpensePro AI"),
-    LOGIN("Sign In"),
-    REGISTER("Create Account"),
-    DASHBOARD("Financial Dashboard"),
-    QUICK_ADD("Quick Add Expense"),
+    DASHBOARD("Expense Tracker & Dashboard"),
+    QUICK_ADD("Add / Edit Expense"),
+    REPORTS("Visualizations & Reports"),
     TRANSACTIONS("Transaction History"),
     CATEGORIES("Expense Categories"),
     BUDGETS("Budget Management"),
     RECURRING("Recurring Expenses"),
-    REPORTS("Reports & Analytics"),
-    AI_INSIGHTS("AI Financial Insights"),
-    PROFILE("Profile & Settings"),
-    EXPORTS("Export & Account")
+    AI_INSIGHTS("Spending Insights"),
+    EXPORTS("Export Reports & Data"),
+    PROFILE("Settings & Build APK"),
+    LANDING("App Overview")
 }
+
+private val DEFAULT_LOCAL_SESSION = AuthSession(
+    userId = "user_demo_expensepro_01",
+    email = "local@expensepro.app",
+    fullName = "Personal Expense Tracker",
+    accessToken = "local_offline_mode",
+    isSupabaseCloudConnected = false
+)
 
 data class ExpenseProUiState(
     val currentPage: AppPage = AppPage.DASHBOARD,
     val pageBackStack: List<AppPage> = emptyList(),
-    val session: AuthSession? = null,
+    val session: AuthSession = DEFAULT_LOCAL_SESSION,
     val profile: ProfileEntity? = null,
-    val authError: String? = null,
     val statusBannerMessage: String? = null,
     val isSupabaseConfigured: Boolean = false,
-    val referenceDateIso: String = "2026-10-29",
+    val referenceDateIso: String = DateRangeEngine.todayIso(),
+    val lastSyncedSystemDayIso: String = DateRangeEngine.todayIso(),
     val globalPeriod: ReportingPeriod = ReportingPeriod.THIS_MONTH,
-    val customStartDateIso: String = "2026-10-01",
-    val customEndDateIso: String = "2026-10-29",
+    val customStartDateIso: String = "${DateRangeEngine.todayIso().take(7)}-01",
+    val customEndDateIso: String = DateRangeEngine.todayIso(),
     val categories: List<CategoryEntity> = emptyList(),
     val expenses: List<ExpenseEntity> = emptyList(),
     val budgets: List<BudgetEntity> = emptyList(),
     val recurringExpenses: List<RecurringExpenseEntity> = emptyList(),
-    val dashboardMetrics: DashboardSummaryMetrics? = null,
+    val dashboardMetrics: DashboardSummaryMetrics = FinancialCalculator.computeDashboardMetrics(
+        allExpenses = emptyList(),
+        categories = emptyList(),
+        period = ReportingPeriod.THIS_MONTH,
+        referenceDateIso = DateRangeEngine.todayIso(),
+        overallMonthlyBudgetMinor = 50_000_00L
+    ),
     val budgetStatuses: List<BudgetStatusItem> = emptyList(),
     val historyFilter: ExpenseFilterState = ExpenseFilterState(),
     val editingExpense: ExpenseEntity? = null,
@@ -100,15 +112,15 @@ class ExpenseProViewModel(
 
     init {
         viewModelScope.launch {
-            val demoProfile = repository.ensureDemoAccountSeeded()
-            val demoSession = AuthSession(
-                userId = demoProfile.id,
-                email = demoProfile.email,
-                fullName = demoProfile.fullName,
-                accessToken = "demo_session_token",
+            val localProfile = repository.ensureDemoAccountSeeded()
+            val localSession = AuthSession(
+                userId = localProfile.id,
+                email = localProfile.email,
+                fullName = localProfile.fullName,
+                accessToken = "local_offline_mode",
                 isSupabaseCloudConnected = repository.isSupabaseConfigured
             )
-            activateSession(demoSession, initialPage = AppPage.DASHBOARD)
+            activateSession(localSession, initialPage = AppPage.DASHBOARD)
         }
     }
 
@@ -118,8 +130,7 @@ class ExpenseProViewModel(
             it.copy(
                 session = session,
                 currentPage = initialPage,
-                pageBackStack = emptyList(),
-                authError = null
+                pageBackStack = emptyList()
             )
         }
 
@@ -200,8 +211,7 @@ class ExpenseProViewModel(
                 currentPage = page,
                 pageBackStack = newStack,
                 editingExpense = if (clearEditExpense && page != AppPage.QUICK_ADD) null else state.editingExpense,
-                statusBannerMessage = null,
-                authError = null
+                statusBannerMessage = null
             )
         }
     }
@@ -221,7 +231,7 @@ class ExpenseProViewModel(
     }
 
     fun clearBanner() {
-        _uiState.update { it.copy(statusBannerMessage = null, authError = null) }
+        _uiState.update { it.copy(statusBannerMessage = null) }
     }
 
     fun setGlobalReportingPeriod(
@@ -271,84 +281,57 @@ class ExpenseProViewModel(
         }
     }
 
-    // Auth Actions
-    fun login(email: String, password: String) {
-        viewModelScope.launch {
-            when (val res = repository.loginUser(email, password)) {
-                is AuthResult.Success -> {
-                    activateSession(res.session, AppPage.DASHBOARD)
-                    _uiState.update { it.copy(statusBannerMessage = res.message) }
-                }
-                is AuthResult.Error -> {
-                    _uiState.update { it.copy(authError = res.message) }
-                }
-            }
-        }
+    fun stepReferenceDate(daysOffset: Int) {
+        val current = _uiState.value.referenceDateIso
+        val next = DateRangeEngine.addDays(current, daysOffset, _uiState.value.profile?.timezone ?: "Asia/Kolkata")
+        setReferenceDate(next)
     }
 
-    fun register(
-        fullName: String,
-        email: String,
-        password: String,
-        currencyCode: String,
-        timezone: String
-    ) {
-        viewModelScope.launch {
-            when (val res = repository.registerUser(fullName, email, password, currencyCode, timezone)) {
-                is AuthResult.Success -> {
-                    activateSession(res.session, AppPage.DASHBOARD)
-                    _uiState.update { it.copy(statusBannerMessage = res.message) }
-                }
-                is AuthResult.Error -> {
-                    _uiState.update { it.copy(authError = res.message) }
-                }
-            }
-        }
+    fun jumpToToday() {
+        val tz = _uiState.value.profile?.timezone ?: "Asia/Kolkata"
+        val today = DateRangeEngine.todayIso(tz)
+        setReferenceDate(today)
     }
 
-    fun resetPassword(email: String, newPassword: String) {
-        viewModelScope.launch {
-            when (val res = repository.resetPassword(email, newPassword)) {
-                is AuthResult.Success -> {
-                    _uiState.update { it.copy(statusBannerMessage = res.message, authError = null) }
-                }
-                is AuthResult.Error -> {
-                    _uiState.update { it.copy(authError = res.message) }
-                }
-            }
-        }
-    }
-
-    fun logout() {
-        userObservationJob?.cancel()
-        _uiState.update {
-            it.copy(
-                session = null,
-                profile = null,
-                expenses = emptyList(),
-                categories = emptyList(),
-                budgets = emptyList(),
-                recurringExpenses = emptyList(),
-                currentPage = AppPage.LANDING,
-                pageBackStack = emptyList(),
-                statusBannerMessage = "You have been signed out safely."
+    /**
+     * Automatically updates the active expense date when the calendar day changes.
+     */
+    fun syncWithCurrentSystemDay() {
+        val state = _uiState.value
+        val tz = state.profile?.timezone ?: "Asia/Kolkata"
+        val currentSystemToday = DateRangeEngine.todayIso(tz)
+        if (currentSystemToday != state.lastSyncedSystemDayIso) {
+            val overallBudget = state.profile?.overallMonthlyBudgetMinor ?: 50_000_00L
+            val updatedMetrics = FinancialCalculator.computeDashboardMetrics(
+                allExpenses = state.expenses,
+                categories = state.categories,
+                period = state.globalPeriod,
+                referenceDateIso = currentSystemToday,
+                overallMonthlyBudgetMinor = overallBudget,
+                customStartIso = state.customStartDateIso,
+                customEndIso = currentSystemToday
             )
+            _uiState.update {
+                it.copy(
+                    referenceDateIso = currentSystemToday,
+                    lastSyncedSystemDayIso = currentSystemToday,
+                    customEndDateIso = currentSystemToday,
+                    dashboardMetrics = updatedMetrics
+                )
+            }
         }
     }
 
-    fun loginAsDemoUser() {
+    fun restoreSampleExpenses() {
+        val session = _uiState.value.session
         viewModelScope.launch {
-            val demo = repository.ensureDemoAccountSeeded()
-            activateSession(
-                AuthSession(
-                    userId = demo.id,
-                    email = demo.email,
-                    fullName = demo.fullName,
-                    accessToken = "demo_token",
-                    isSupabaseCloudConnected = repository.isSupabaseConfigured
-                ),
-                AppPage.DASHBOARD
-            )
+            repository.restoreSampleDataForUser(session.userId)
+            _uiState.update {
+                it.copy(
+                    currentPage = AppPage.DASHBOARD,
+                    statusBannerMessage = "Sample expenses and visualizations restored!"
+                )
+            }
         }
     }
 
@@ -804,12 +787,13 @@ class ExpenseProViewModel(
         }
     }
 
-    fun deleteCurrentAccount() {
-        val session = _uiState.value.session ?: return
+    fun clearAllExpenses() {
+        val session = _uiState.value.session
         viewModelScope.launch {
-            repository.deleteAccountAndAllData(session.userId)
-            logout()
-            _uiState.update { it.copy(statusBannerMessage = "Your account and all financial records have been permanently deleted.") }
+            repository.clearAllExpensesForUser(session.userId)
+            _uiState.update {
+                it.copy(statusBannerMessage = "All expenses cleared. Your categories and settings are preserved.")
+            }
         }
     }
 

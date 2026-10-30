@@ -28,7 +28,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ListAlt
-import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Analytics
@@ -39,10 +38,9 @@ import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -88,11 +86,9 @@ import com.example.ui.screens.CategoriesManagementScreen
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.ExportAndAccountScreen
 import com.example.ui.screens.LandingScreen
-import com.example.ui.screens.LoginScreen
 import com.example.ui.screens.ProfileAndSettingsScreen
 import com.example.ui.screens.QuickAddExpenseScreen
 import com.example.ui.screens.RecurringExpensesScreen
-import com.example.ui.screens.RegistrationScreen
 import com.example.ui.screens.ReportsAndAnalyticsScreen
 import com.example.ui.screens.TransactionHistoryScreen
 import com.example.ui.theme.Emerald500
@@ -137,24 +133,10 @@ private data class NavMenuItem(
     val icon: ImageVector
 )
 
-private val AUTHENTICATED_NAV_ITEMS = listOf(
-    NavMenuItem(AppPage.DASHBOARD, "Dashboard", Icons.Default.Dashboard),
-    NavMenuItem(AppPage.QUICK_ADD, "Quick Add", Icons.Default.AddCircle),
-    NavMenuItem(AppPage.TRANSACTIONS, "Transactions", Icons.AutoMirrored.Filled.ListAlt),
-    NavMenuItem(AppPage.CATEGORIES, "Categories", Icons.Default.Category),
-    NavMenuItem(AppPage.BUDGETS, "Budgets", Icons.Default.Savings),
-    NavMenuItem(AppPage.RECURRING, "Recurring", Icons.Default.Repeat),
-    NavMenuItem(AppPage.REPORTS, "Reports & Charts", Icons.Default.Analytics),
-    NavMenuItem(AppPage.AI_INSIGHTS, "AI Insights", Icons.Default.AutoAwesome),
-    NavMenuItem(AppPage.EXPORTS, "Export Reports", Icons.Default.Download),
-    NavMenuItem(AppPage.PROFILE, "Profile & Settings", Icons.Default.Person),
-    NavMenuItem(AppPage.LANDING, "Product Overview", Icons.Default.Home)
-)
-
-private val PUBLIC_NAV_ITEMS = listOf(
-    NavMenuItem(AppPage.LANDING, "Landing Page", Icons.Default.Home),
-    NavMenuItem(AppPage.LOGIN, "Sign In", Icons.AutoMirrored.Filled.Login),
-    NavMenuItem(AppPage.REGISTER, "Register", Icons.Default.PersonAdd)
+private val MAIN_NAV_ITEMS = listOf(
+    NavMenuItem(AppPage.DASHBOARD, "Expenses (Add & Delete)", Icons.Default.Dashboard),
+    NavMenuItem(AppPage.REPORTS, "Visualizations & Charts", Icons.Default.Analytics),
+    NavMenuItem(AppPage.PROFILE, "Settings & Build APK", Icons.Default.Settings)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -171,7 +153,7 @@ fun ExpenseProAppRoot(
     val scope = rememberCoroutineScope()
     var isDesktopSidebarCollapsed by remember { mutableStateOf(false) }
 
-    val navItems = if (uiState.session != null) AUTHENTICATED_NAV_ITEMS else PUBLIC_NAV_ITEMS
+    val navItems = MAIN_NAV_ITEMS
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isWideScreen = maxWidth >= 680.dp
@@ -200,12 +182,12 @@ fun ExpenseProAppRoot(
                             )
                             Column {
                                 Text(
-                                    text = "ExpensePro AI",
+                                    text = "ExpensePro",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = uiState.profile?.email ?: "Personal Finance SaaS",
+                                    text = "Simple Expense Tracker",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -241,13 +223,11 @@ fun ExpenseProAppRoot(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                if (uiState.session != null) {
-                                    Text(
-                                        text = "${uiState.currencyCode} • ${uiState.globalPeriod.label}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFF94A3B8)
-                                    )
-                                }
+                                Text(
+                                    text = "${uiState.currencyCode} • Date: ${uiState.referenceDateIso}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFF94A3B8)
+                                )
                             }
                         },
                         navigationIcon = {
@@ -283,27 +263,25 @@ fun ExpenseProAppRoot(
                             }
                         },
                         actions = {
-                            if (uiState.session != null) {
-                                IconButton(
-                                    onClick = { viewModel.navigateTo(AppPage.QUICK_ADD) },
-                                    modifier = Modifier.testTag("top_bar_quick_add_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.AddCircle,
-                                        contentDescription = "Quick Add Expense",
-                                        tint = Emerald500
-                                    )
-                                }
-                                IconButton(
-                                    onClick = { viewModel.navigateTo(AppPage.PROFILE) },
-                                    modifier = Modifier.testTag("top_bar_profile_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Person,
-                                        contentDescription = "Profile & Settings",
-                                        tint = Color.White
-                                    )
-                                }
+                            IconButton(
+                                onClick = { viewModel.navigateTo(AppPage.REPORTS) },
+                                modifier = Modifier.testTag("top_bar_visualizations_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Analytics,
+                                    contentDescription = "Visualizations & Charts",
+                                    tint = Emerald500
+                                )
+                            }
+                            IconButton(
+                                onClick = { viewModel.navigateTo(AppPage.PROFILE) },
+                                modifier = Modifier.testTag("top_bar_profile_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "Settings & Build APK",
+                                    tint = Color.White
+                                )
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
@@ -313,13 +291,11 @@ fun ExpenseProAppRoot(
                     )
                 },
                 bottomBar = {
-                    if (!isWideScreen && uiState.session != null) {
+                    if (!isWideScreen) {
                         val bottomTabs = listOf(
-                            NavMenuItem(AppPage.DASHBOARD, "Dashboard", Icons.Default.Dashboard),
-                            NavMenuItem(AppPage.QUICK_ADD, "Add", Icons.Default.AddCircle),
-                            NavMenuItem(AppPage.TRANSACTIONS, "History", Icons.AutoMirrored.Filled.ListAlt),
-                            NavMenuItem(AppPage.REPORTS, "Reports", Icons.Default.Analytics),
-                            NavMenuItem(AppPage.AI_INSIGHTS, "Insights", Icons.Default.AutoAwesome)
+                            NavMenuItem(AppPage.DASHBOARD, "Expenses", Icons.Default.Dashboard),
+                            NavMenuItem(AppPage.REPORTS, "Visualizations", Icons.Default.Analytics),
+                            NavMenuItem(AppPage.PROFILE, "Settings", Icons.Default.Settings)
                         )
                         NavigationBar {
                             bottomTabs.forEach { tab ->
@@ -430,30 +406,18 @@ fun ExpenseProAppRoot(
                         }
 
                         Box(modifier = Modifier.fillMaxSize()) {
-                            // Protected route enforcement
-                            val requiresAuth = uiState.currentPage !in listOf(
-                                AppPage.LANDING,
-                                AppPage.LOGIN,
-                                AppPage.REGISTER
-                            )
-                            if (requiresAuth && uiState.session == null) {
-                                LoginScreen(uiState = uiState, viewModel = viewModel)
-                            } else {
-                                when (uiState.currentPage) {
-                                    AppPage.LANDING -> LandingScreen(uiState, viewModel)
-                                    AppPage.LOGIN -> LoginScreen(uiState, viewModel)
-                                    AppPage.REGISTER -> RegistrationScreen(uiState, viewModel)
-                                    AppPage.DASHBOARD -> DashboardScreen(uiState, viewModel)
-                                    AppPage.QUICK_ADD -> QuickAddExpenseScreen(uiState, viewModel)
-                                    AppPage.TRANSACTIONS -> TransactionHistoryScreen(uiState, viewModel)
-                                    AppPage.CATEGORIES -> CategoriesManagementScreen(uiState, viewModel)
-                                    AppPage.BUDGETS -> BudgetManagementScreen(uiState, viewModel)
-                                    AppPage.RECURRING -> RecurringExpensesScreen(uiState, viewModel)
-                                    AppPage.REPORTS -> ReportsAndAnalyticsScreen(uiState, viewModel)
-                                    AppPage.AI_INSIGHTS -> AiInsightsScreen(uiState, viewModel)
-                                    AppPage.PROFILE -> ProfileAndSettingsScreen(uiState, viewModel)
-                                    AppPage.EXPORTS -> ExportAndAccountScreen(uiState, viewModel)
-                                }
+                            when (uiState.currentPage) {
+                                AppPage.DASHBOARD -> DashboardScreen(uiState, viewModel)
+                                AppPage.QUICK_ADD -> QuickAddExpenseScreen(uiState, viewModel)
+                                AppPage.REPORTS -> ReportsAndAnalyticsScreen(uiState, viewModel)
+                                AppPage.TRANSACTIONS -> TransactionHistoryScreen(uiState, viewModel)
+                                AppPage.CATEGORIES -> CategoriesManagementScreen(uiState, viewModel)
+                                AppPage.BUDGETS -> BudgetManagementScreen(uiState, viewModel)
+                                AppPage.RECURRING -> RecurringExpensesScreen(uiState, viewModel)
+                                AppPage.AI_INSIGHTS -> AiInsightsScreen(uiState, viewModel)
+                                AppPage.PROFILE -> ProfileAndSettingsScreen(uiState, viewModel)
+                                AppPage.EXPORTS -> ExportAndAccountScreen(uiState, viewModel)
+                                AppPage.LANDING -> LandingScreen(uiState, viewModel)
                             }
                         }
                     }

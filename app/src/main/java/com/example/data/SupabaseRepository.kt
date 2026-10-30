@@ -394,6 +394,24 @@ class ExpenseProRepository(
         newExpenses.size
     }
 
+    suspend fun clearAllExpensesForUser(userId: String) = withContext(Dispatchers.IO) {
+        dao.deleteAllUserExpenses(userId)
+    }
+
+    suspend fun restoreSampleDataForUser(userId: String) = withContext(Dispatchers.IO) {
+        var categories = dao.getCategoriesForUser(userId)
+        if (categories.isEmpty()) {
+            categories = DefaultCategoriesSeed.buildCategoriesForUser(userId)
+            dao.upsertCategories(categories)
+        }
+        val expenses = DefaultCategoriesSeed.buildSampleExpensesForDemoUser(userId, categories)
+        dao.upsertExpenses(expenses)
+        val budgets = DefaultCategoriesSeed.buildSampleBudgetsForDemoUser(userId, categories)
+        dao.upsertBudgets(budgets)
+        val recurring = DefaultCategoriesSeed.buildSampleRecurringForDemoUser(userId, categories)
+        dao.upsertRecurringExpenses(recurring)
+    }
+
     suspend fun deleteAccountAndAllData(userId: String) = withContext(Dispatchers.IO) {
         dao.deleteAllUserExpenses(userId)
         dao.deleteAllUserBudgets(userId)

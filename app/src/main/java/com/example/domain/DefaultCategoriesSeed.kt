@@ -232,7 +232,8 @@ object DefaultCategoriesSeed {
 
     fun buildSampleExpensesForDemoUser(
         userId: String,
-        categories: List<CategoryEntity>
+        categories: List<CategoryEntity>,
+        todayIso: String = DateRangeEngine.todayIso()
     ): List<ExpenseEntity> {
         fun catId(name: String): String =
             categories.firstOrNull { it.parentCategoryId == null && it.name.equals(name, true) }?.id
@@ -243,248 +244,89 @@ object DefaultCategoriesSeed {
             return categories.firstOrNull { it.parentCategoryId == pid && it.name.equals(subName, true) }?.id
         }
 
+        val yesterdayIso = DateRangeEngine.addDays(todayIso, -1)
+        val threeDaysAgoIso = DateRangeEngine.addDays(todayIso, -3)
+        val fiveDaysAgoIso = DateRangeEngine.addDays(todayIso, -5)
+        val lastMonthIso = DateRangeEngine.addMonthsSafe(todayIso, -1)
+
         return listOf(
             ExpenseEntity(
                 id = "demo_tx_1",
                 userId = userId,
                 categoryId = catId("Groceries"),
                 subcategoryId = subId("Groceries", "Grocery Store"),
-                title = "Monthly Groceries",
-                amountMinor = 1_500_00L,
+                title = "Groceries & Vegetables",
+                amountMinor = 500_00L,
                 currency = "INR",
-                expenseDateIso = "2026-10-29",
+                expenseDateIso = todayIso,
                 paymentMethod = "UPI",
-                merchant = "FreshMart Supermarket",
-                description = "Monthly household staples, pulses, and cooking oil",
-                notes = "Used UPI cashback offer",
-                tags = "groceries,monthly,essential"
+                merchant = "FreshMart",
+                description = "Daily groceries and vegetables"
             ),
             ExpenseEntity(
                 id = "demo_tx_2",
                 userId = userId,
                 categoryId = catId("Milk and Dairy"),
                 subcategoryId = subId("Milk and Dairy", "Milk"),
-                title = "Morning Farm Fresh Milk & Curd",
-                amountMinor = 180_00L,
+                title = "Morning Fresh Milk",
+                amountMinor = 60_00L,
                 currency = "INR",
-                expenseDateIso = "2026-10-29",
-                paymentMethod = "UPI",
-                merchant = "Nandini Dairy Parlour",
-                description = "2L full cream milk and 500g curd",
-                notes = "Daily dairy purchase",
-                tags = "dairy,milk"
+                expenseDateIso = todayIso,
+                paymentMethod = "Cash",
+                merchant = "Dairy Parlour",
+                description = "Daily milk"
             ),
             ExpenseEntity(
                 id = "demo_tx_3",
                 userId = userId,
                 categoryId = catId("Fuel and Transportation"),
                 subcategoryId = subId("Fuel and Transportation", "Petrol"),
-                title = "Car Petrol Refill",
-                amountMinor = 2_450_00L,
+                title = "Bike Petrol",
+                amountMinor = 300_00L,
                 currency = "INR",
-                expenseDateIso = "2026-10-28",
-                paymentMethod = "Credit Card",
-                merchant = "IndianOil Highway Station",
-                description = "Full tank petrol refill",
-                notes = "Surcharge waiver applied",
-                tags = "petrol,commute"
+                expenseDateIso = yesterdayIso,
+                paymentMethod = "UPI",
+                merchant = "IndianOil",
+                description = "Petrol refill"
             ),
             ExpenseEntity(
                 id = "demo_tx_4",
                 userId = userId,
                 categoryId = catId("Household Bills"),
                 subcategoryId = subId("Household Bills", "Electricity Bill"),
-                title = "October Electricity Bill",
-                amountMinor = 2_840_00L,
+                title = "Electricity Bill",
+                amountMinor = 1_250_00L,
                 currency = "INR",
-                expenseDateIso = "2026-10-25",
-                paymentMethod = "Net Banking",
-                merchant = "BESCOM Power Utility",
-                description = "Monthly residential electricity bill (342 kWh)",
-                notes = "Paid before due date",
-                tags = "electricity,utility,bills"
+                expenseDateIso = threeDaysAgoIso,
+                paymentMethod = "UPI",
+                merchant = "Power Utility",
+                description = "Monthly electricity bill"
             ),
             ExpenseEntity(
                 id = "demo_tx_5",
                 userId = userId,
-                categoryId = catId("Household Bills"),
-                subcategoryId = subId("Household Bills", "Internet Bill"),
-                title = "Fiber Broadband 300 Mbps",
-                amountMinor = 1_178_00L,
+                categoryId = catId("Food and Dining"),
+                subcategoryId = subId("Food and Dining", "Restaurants"),
+                title = "Family Dinner",
+                amountMinor = 650_00L,
                 currency = "INR",
-                expenseDateIso = "2026-10-22",
+                expenseDateIso = fiveDaysAgoIso,
                 paymentMethod = "Credit Card",
-                merchant = "Airtel Xstream Fiber",
-                description = "High-speed home broadband plan",
-                notes = "Includes GST",
-                tags = "internet,wifi,work"
+                merchant = "Spice Bistro",
+                description = "Dinner"
             ),
             ExpenseEntity(
                 id = "demo_tx_6",
                 userId = userId,
-                categoryId = catId("Housing"),
-                subcategoryId = subId("Housing", "House Rent"),
-                title = "October Apartment Rent",
-                amountMinor = 18_500_00L,
-                currency = "INR",
-                expenseDateIso = "2026-10-05",
-                paymentMethod = "Bank Transfer",
-                merchant = "GreenView Residency",
-                description = "Monthly 2BHK apartment rent",
-                notes = "NEFT reference #98412",
-                tags = "rent,housing"
-            ),
-            ExpenseEntity(
-                id = "demo_tx_7",
-                userId = userId,
-                categoryId = catId("Food and Dining"),
-                subcategoryId = subId("Food and Dining", "Restaurants"),
-                title = "Family Weekend Dinner",
-                amountMinor = 1_860_00L,
-                currency = "INR",
-                expenseDateIso = "2026-10-18",
-                paymentMethod = "Credit Card",
-                merchant = "Spice Terrace Bistro",
-                description = "Dinner with family",
-                notes = "10% dining reward",
-                tags = "dining,family"
-            ),
-            ExpenseEntity(
-                id = "demo_tx_8",
-                userId = userId,
-                categoryId = catId("Healthcare"),
-                subcategoryId = subId("Healthcare", "Medicines"),
-                title = "Monthly Vitamins & Pharmacy",
-                amountMinor = 940_00L,
-                currency = "INR",
-                expenseDateIso = "2026-10-14",
-                paymentMethod = "UPI",
-                merchant = "Apollo Pharmacy",
-                description = "Multivitamins and first-aid supplies",
-                notes = "",
-                tags = "health,pharmacy"
-            ),
-            ExpenseEntity(
-                id = "demo_tx_9",
-                userId = userId,
-                categoryId = catId("Education"),
-                subcategoryId = subId("Education", "Courses"),
-                title = "Cloud Architecture Certification Course",
-                amountMinor = 3_200_00L,
-                currency = "INR",
-                expenseDateIso = "2026-10-10",
-                paymentMethod = "Credit Card",
-                merchant = "Coursera / TechAcademy",
-                description = "Annual professional learning module",
-                notes = "",
-                tags = "education,upskilling"
-            ),
-            // Previous month (September 2026) for MoM & Q3 comparisons
-            ExpenseEntity(
-                id = "demo_tx_10",
-                userId = userId,
-                categoryId = catId("Housing"),
-                subcategoryId = subId("Housing", "House Rent"),
-                title = "September Apartment Rent",
-                amountMinor = 18_500_00L,
-                currency = "INR",
-                expenseDateIso = "2026-09-05",
-                paymentMethod = "Bank Transfer",
-                merchant = "GreenView Residency",
-                description = "Monthly apartment rent",
-                notes = "",
-                tags = "rent,housing"
-            ),
-            ExpenseEntity(
-                id = "demo_tx_11",
-                userId = userId,
                 categoryId = catId("Groceries"),
                 subcategoryId = subId("Groceries", "Vegetables"),
-                title = "September Supermarket & Produce",
-                amountMinor = 6_400_00L,
+                title = "Last Month Groceries",
+                amountMinor = 2_400_00L,
                 currency = "INR",
-                expenseDateIso = "2026-09-16",
+                expenseDateIso = lastMonthIso,
                 paymentMethod = "UPI",
-                merchant = "FreshMart Supermarket",
-                description = "Groceries, fruits, and grains",
-                notes = "",
-                tags = "groceries"
-            ),
-            ExpenseEntity(
-                id = "demo_tx_12",
-                userId = userId,
-                categoryId = catId("Fuel and Transportation"),
-                subcategoryId = subId("Fuel and Transportation", "Petrol"),
-                title = "September Petrol Refills",
-                amountMinor = 2_100_00L,
-                currency = "INR",
-                expenseDateIso = "2026-09-21",
-                paymentMethod = "Credit Card",
-                merchant = "HP Auto Care",
-                description = "Petrol for city commute",
-                notes = "",
-                tags = "petrol"
-            ),
-            ExpenseEntity(
-                id = "demo_tx_13",
-                userId = userId,
-                categoryId = catId("Household Bills"),
-                subcategoryId = subId("Household Bills", "Electricity Bill"),
-                title = "September Electricity Bill",
-                amountMinor = 2_610_00L,
-                currency = "INR",
-                expenseDateIso = "2026-09-24",
-                paymentMethod = "Net Banking",
-                merchant = "BESCOM Power Utility",
-                description = "Electricity bill",
-                notes = "",
-                tags = "electricity,bills"
-            ),
-            // Earlier in 2026 (H1: March & May 2026) and 2025 for Half-Yearly & YoY charts
-            ExpenseEntity(
-                id = "demo_tx_14",
-                userId = userId,
-                categoryId = catId("Travel"),
-                subcategoryId = subId("Travel", "Flight Tickets"),
-                title = "Spring Family Vacation Flights",
-                amountMinor = 14_200_00L,
-                currency = "INR",
-                expenseDateIso = "2026-03-14",
-                paymentMethod = "Credit Card",
-                merchant = "IndiGo Airlines",
-                description = "Round-trip domestic flights",
-                notes = "Q1 travel",
-                tags = "travel,flights"
-            ),
-            ExpenseEntity(
-                id = "demo_tx_15",
-                userId = userId,
-                categoryId = catId("Financial Obligations"),
-                subcategoryId = subId("Financial Obligations", "Insurance Premiums"),
-                title = "Annual Term & Health Insurance Renewal",
-                amountMinor = 11_500_00L,
-                currency = "INR",
-                expenseDateIso = "2026-05-19",
-                paymentMethod = "Net Banking",
-                merchant = "HDFC ERGO Insurance",
-                description = "Annual policy renewal",
-                notes = "Q2 H1 protection",
-                tags = "insurance,finance"
-            ),
-            ExpenseEntity(
-                id = "demo_tx_16",
-                userId = userId,
-                categoryId = catId("Housing"),
-                subcategoryId = subId("Housing", "House Rent"),
-                title = "2025 Annual Housing Summary Entry",
-                amountMinor = 28_000_00L,
-                currency = "INR",
-                expenseDateIso = "2025-10-15",
-                paymentMethod = "Bank Transfer",
-                merchant = "GreenView Residency",
-                description = "Prior year comparative benchmark",
-                notes = "",
-                tags = "housing,2025"
+                merchant = "Supermarket",
+                description = "Previous month groceries"
             )
         )
     }
