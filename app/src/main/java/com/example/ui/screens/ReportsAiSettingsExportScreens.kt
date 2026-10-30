@@ -315,19 +315,6 @@ fun ReportsAndAnalyticsScreen(
                                 modifier = Modifier.weight(1f)
                             )
                         }
-                        Text("Filter Categories", style = MaterialTheme.typography.labelMedium)
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            topCategories.forEach { cat ->
-                                val isSel = cat.id in selectedCustomCatIds
-                                FilterChip(
-                                    selected = isSel,
-                                    onClick = {
-                                        selectedCustomCatIds = if (isSel) selectedCustomCatIds - cat.id else selectedCustomCatIds + cat.id
-                                    },
-                                    label = { Text(cat.name) }
-                                )
-                            }
-                        }
                         Text("Filter Payment Method", style = MaterialTheme.typography.labelMedium)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             PaymentMethod.entries.forEach { pm ->
@@ -429,7 +416,7 @@ fun ReportsAndAnalyticsScreen(
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text(
-                        text = "Highest Category: ${report.highestCategory?.categoryName ?: "None"}",
+                        text = "Largest Expense: ${report.highestCategory?.categoryName ?: "None"}",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
@@ -452,11 +439,11 @@ fun ReportsAndAnalyticsScreen(
             }
         }
 
-        // Complete 10 Interactive Charts Showcase (Section 13)
-        ChartCard("1. Category-Wise Spending Donut Chart") {
+        // Complete 10 Interactive Charts Showcase Generated from Expense Amounts
+        ChartCard("1. Expense Amount Distribution Donut Chart") {
             CategoryDonutChart(items = report.categoryBreakdown, currencyCode = currency)
         }
-        ChartCard("2. Total Spending by Category Vertical Bar Chart") {
+        ChartCard("2. Expense Amounts Vertical Bar Chart") {
             CategoryVerticalBarChart(items = report.categoryBreakdown, currencyCode = currency)
         }
         ChartCard("3. Daily Expense Trends Line Chart") {
@@ -465,14 +452,14 @@ fun ReportsAndAnalyticsScreen(
         ChartCard("4. Monthly Expenses Column Chart") {
             MonthlyColumnChart(monthlyItems = allMonthlyTotals, currencyCode = currency)
         }
-        ChartCard("5. Grouped Bar Chart Comparing Categories Across Months") {
+        ChartCard("5. Grouped Bar Chart Comparing Expense Amounts Across Months") {
             GroupedCategoryMonthChart(
                 monthlyItems = allMonthlyTotals,
                 categories = uiState.categories,
                 currencyCode = currency
             )
         }
-        ChartCard("6. Top Spending Categories Horizontal Bar Chart") {
+        ChartCard("6. Top Expense Amounts Horizontal Bar Chart") {
             TopCategoriesHorizontalBarChart(items = report.categoryBreakdown, currencyCode = currency)
         }
         ChartCard("7. Daily Spending Intensity Calendar Heatmap ($selectedYear-${String.format("%02d", selectedMonth)})") {
@@ -483,7 +470,7 @@ fun ReportsAndAnalyticsScreen(
                 currencyCode = currency
             )
         }
-        ChartCard("8. Category-Wise Monthly Stacked Bar Chart") {
+        ChartCard("8. Monthly Expense Amounts Stacked Bar Chart") {
             MonthlyStackedCategoryChart(
                 monthlyItems = allMonthlyTotals,
                 categories = uiState.categories,

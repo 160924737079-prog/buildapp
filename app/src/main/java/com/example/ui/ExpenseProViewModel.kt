@@ -364,13 +364,37 @@ class ExpenseProViewModel(
         receiptUri: String?,
         onSuccess: () -> Unit = {}
     ) {
-        val session = _uiState.value.session ?: return
+        val session = _uiState.value.session
+        val amountMinor = MoneyUtils.toMinorUnits(amountText)
+        if (amountMinor == null || amountMinor <= 0L) {
+            _uiState.update { it.copy(statusBannerMessage = "Enter a valid positive amount in Add Expense (e.g., 500 or 120.50).") }
+            return
+        }
+
+        val nextNumber = _uiState.value.expenses.size + 1
+        val effectiveTitle = title.trim().ifEmpty {
+            "Expense #$nextNumber (${MoneyUtils.formatMoney(amountMinor, _uiState.value.currencyCode)})"
+        }
+        val effectiveCategoryId = categoryId.trim().ifEmpty {
+            if (title.trim().isNotEmpty()) {
+                "exp_${title.trim().lowercase().replace(Regex("[^a-z0-9]+"), "_")}"
+            } else {
+                "exp_${UUID.randomUUID().toString().replace("-", "").take(10)}"
+            }
+        }
+        val effectiveDateIso = if (DateRangeEngine.isValidIsoDate(expenseDateIso.trim())) {
+            expenseDateIso.trim()
+        } else {
+            _uiState.value.referenceDateIso
+        }
+        val effectivePaymentMethod = paymentMethod.trim().ifEmpty { "UPI" }
+
         val validation = ExpenseValidator.validateExpenseInput(
-            title = title,
+            title = effectiveTitle,
             amountText = amountText,
-            categoryId = categoryId,
-            expenseDateIso = expenseDateIso,
-            paymentMethod = paymentMethod
+            categoryId = effectiveCategoryId,
+            expenseDateIso = effectiveDateIso,
+            paymentMethod = effectivePaymentMethod
         )
         if (!validation.isValid) {
             val msg = validation.errors.values.firstOrNull() ?: "Please check form inputs."
@@ -378,18 +402,17 @@ class ExpenseProViewModel(
             return
         }
 
-        val amountMinor = MoneyUtils.toMinorUnits(amountText) ?: return
         val editing = _uiState.value.editingExpense
         val entity = ExpenseEntity(
             id = editing?.id ?: "tx_${UUID.randomUUID().toString().replace("-", "").take(12)}",
             userId = session.userId,
-            categoryId = categoryId,
+            categoryId = effectiveCategoryId,
             subcategoryId = subcategoryId?.takeIf { it.isNotBlank() },
-            title = title.trim(),
+            title = effectiveTitle,
             amountMinor = amountMinor,
             currency = _uiState.value.currencyCode,
-            expenseDateIso = expenseDateIso,
-            paymentMethod = paymentMethod,
+            expenseDateIso = effectiveDateIso,
+            paymentMethod = effectivePaymentMethod,
             merchant = merchant.trim(),
             description = description.trim(),
             notes = notes.trim(),
@@ -410,7 +433,7 @@ class ExpenseProViewModel(
                             statusBannerMessage = if (editing != null) {
                                 "Updated '${entity.title}' (${MoneyUtils.formatMoney(amountMinor, it.currencyCode)})"
                             } else {
-                                "Saved '${entity.title}' (${MoneyUtils.formatMoney(amountMinor, it.currencyCode)})"
+                                "Added ${MoneyUtils.formatMoney(amountMinor, it.currencyCode)} — Visualizations updated!"
                             }
                         )
                     }

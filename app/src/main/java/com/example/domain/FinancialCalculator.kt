@@ -108,6 +108,27 @@ data class TimeHorizonReport(
  */
 object FinancialCalculator {
 
+    val CHART_COLOR_PALETTE = listOf(
+        "#10B981", // Emerald
+        "#3B82F6", // Blue
+        "#F59E0B", // Amber
+        "#EC4899", // Pink
+        "#8B5CF6", // Violet
+        "#06B6D4", // Cyan
+        "#F97316", // Orange
+        "#14B8A6", // Teal
+        "#6366F1", // Indigo
+        "#EF4444"  // Red
+    )
+
+    fun colorForKey(key: String, indexHint: Int = -1): String {
+        if (indexHint >= 0) {
+            return CHART_COLOR_PALETTE[indexHint % CHART_COLOR_PALETTE.size]
+        }
+        val hash = kotlin.math.abs(key.hashCode())
+        return CHART_COLOR_PALETTE[hash % CHART_COLOR_PALETTE.size]
+    }
+
     fun filterQualifyingExpenses(
         allTransactions: List<ExpenseEntity>,
         startDateIso: String? = null,
@@ -152,23 +173,29 @@ object FinancialCalculator {
         val overallTotal = qualifyingExpenses.sumOf { it.amountMinor }
         if (qualifyingExpenses.isEmpty()) return emptyList()
 
-        return qualifyingExpenses
-            .groupBy { it.categoryId }
-            .map { (catId, list) ->
-                val cat = catMap[catId]
-                val catTotal = list.sumOf { it.amountMinor }
-                CategoryBreakdownItem(
-                    categoryId = catId,
-                    categoryName = cat?.name ?: "Uncategorized",
-                    colorHex = cat?.colorHex ?: "#10B981",
-                    iconName = cat?.iconName ?: "category",
-                    totalMinor = catTotal,
-                    transactionCount = list.size,
-                    percentageOfTotal = MoneyUtils.percentage(catTotal, overallTotal),
-                    budgetMinor = cat?.monthlyBudgetMinor
-                )
+        val sortedGroups = qualifyingExpenses
+            .groupBy { it.categoryId.ifBlank { it.id } }
+            .entries
+            .sortedByDescending { (_, list) -> list.sumOf { it.amountMinor } }
+
+        return sortedGroups.mapIndexed { idx, (catId, list) ->
+            val cat = catMap[catId]
+            val catTotal = list.sumOf { it.amountMinor }
+            val firstTx = list.first()
+            val displayName = cat?.name ?: firstTx.title.ifBlank {
+                MoneyUtils.formatMoney(catTotal, firstTx.currency)
             }
-            .sortedByDescending { it.totalMinor }
+            CategoryBreakdownItem(
+                categoryId = catId,
+                categoryName = displayName,
+                colorHex = cat?.colorHex ?: colorForKey(catId, idx),
+                iconName = cat?.iconName ?: "payments",
+                totalMinor = catTotal,
+                transactionCount = list.size,
+                percentageOfTotal = MoneyUtils.percentage(catTotal, overallTotal),
+                budgetMinor = cat?.monthlyBudgetMinor
+            )
+        }
     }
 
     fun calculatePaymentBreakdown(qualifyingExpenses: List<ExpenseEntity>): List<PaymentMethodBreakdownItem> {

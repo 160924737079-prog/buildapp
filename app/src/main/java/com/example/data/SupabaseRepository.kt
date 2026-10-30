@@ -63,11 +63,19 @@ class ExpenseProRepository(
 
     suspend fun ensureDemoAccountSeeded(): ProfileEntity = withContext(Dispatchers.IO) {
         val demoEmail = "alex.morgan@expensepro.ai"
+        val demoUserId = "user_demo_expensepro_01"
+        // Ensure all 12 removed preset categories, category budgets, recurring items, and preset demo transactions are purged
+        dao.deleteAllUserCategories(demoUserId)
+        dao.deleteAllUserBudgets(demoUserId)
+        dao.deleteAllUserRecurring(demoUserId)
+        listOf("demo_tx_1", "demo_tx_2", "demo_tx_3", "demo_tx_4", "demo_tx_5", "demo_tx_6").forEach { oldId ->
+            dao.hardDeleteExpense(oldId, demoUserId)
+        }
+
         val existing = dao.getProfileByEmail(demoEmail)
         if (existing != null) {
             return@withContext existing
         }
-        val demoUserId = "user_demo_expensepro_01"
         val profile = ProfileEntity(
             id = demoUserId,
             email = demoEmail,
@@ -83,14 +91,6 @@ class ExpenseProRepository(
             aiEnabled = true
         )
         dao.upsertProfile(profile)
-        val categories = DefaultCategoriesSeed.buildCategoriesForUser(demoUserId)
-        dao.upsertCategories(categories)
-        val expenses = DefaultCategoriesSeed.buildSampleExpensesForDemoUser(demoUserId, categories)
-        dao.upsertExpenses(expenses)
-        val budgets = DefaultCategoriesSeed.buildSampleBudgetsForDemoUser(demoUserId, categories)
-        dao.upsertBudgets(budgets)
-        val recurring = DefaultCategoriesSeed.buildSampleRecurringForDemoUser(demoUserId, categories)
-        dao.upsertRecurringExpenses(recurring)
         profile
     }
 

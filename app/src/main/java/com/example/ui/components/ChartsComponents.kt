@@ -394,7 +394,7 @@ fun MonthlyColumnChart(
 }
 
 /**
- * 5. Grouped Bar Chart for Comparing Categories Across Months
+ * 5. Grouped Bar Chart for Comparing Expense Amounts Across Months
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -405,13 +405,27 @@ fun GroupedCategoryMonthChart(
     modifier: Modifier = Modifier
 ) {
     val months = monthlyItems.takeLast(4)
-    val topCats = categories.filter { it.parentCategoryId == null }.take(3)
-    if (months.isEmpty() || topCats.isEmpty()) {
-        EmptyChartPlaceholder("Not enough multi-month category data to compare.")
+    val catMap = categories.associateBy { it.id }
+    val topKeys: List<Triple<String, String, String>> = if (categories.isNotEmpty()) {
+        categories.filter { it.parentCategoryId == null }.take(3).map { Triple(it.id, it.name, it.colorHex) }
+    } else {
+        months.flatMap { it.byCategoryMinor.entries }
+            .groupBy { it.key }
+            .mapValues { (_, list) -> list.sumOf { it.value } }
+            .entries
+            .sortedByDescending { it.value }
+            .take(3)
+            .mapIndexed { idx, (key, _) ->
+                val cleanName = key.removePrefix("exp_").replace("_", " ").replaceFirstChar { it.uppercase() }
+                Triple(key, cleanName.ifBlank { "Expense #${idx + 1}" }, com.example.domain.FinancialCalculator.colorForKey(key, idx))
+            }
+    }
+    if (months.isEmpty() || topKeys.isEmpty()) {
+        EmptyChartPlaceholder("Add expense amounts to compare across months.")
         return
     }
     val maxVal = months.maxOf { m ->
-        topCats.maxOfOrNull { c -> m.byCategoryMinor[c.id] ?: 0L } ?: 1L
+        topKeys.maxOfOrNull { (key, _, _) -> m.byCategoryMinor[key] ?: 0L } ?: 1L
     }.coerceAtLeast(1L)
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -419,10 +433,10 @@ fun GroupedCategoryMonthChart(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            topCats.forEach { cat ->
+            topKeys.forEach { (_, name, colorHex) ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(parseHexColor(cat.colorHex)))
-                    Text(cat.name, style = MaterialTheme.typography.labelSmall)
+                    Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(parseHexColor(colorHex)))
+                    Text(name, style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
@@ -442,15 +456,15 @@ fun GroupedCategoryMonthChart(
                         verticalAlignment = Alignment.Bottom,
                         modifier = Modifier.weight(1f)
                     ) {
-                        topCats.forEach { cat ->
-                            val v = m.byCategoryMinor[cat.id] ?: 0L
+                        topKeys.forEach { (key, _, colorHex) ->
+                            val v = m.byCategoryMinor[key] ?: 0L
                             val hRatio = (v.toFloat() / maxVal.toFloat()).coerceIn(0.05f, 1f)
                             Box(
                                 modifier = Modifier
                                     .width(12.dp)
                                     .fillMaxHeight(hRatio * 0.85f)
                                     .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                                    .background(parseHexColor(cat.colorHex))
+                                    .background(parseHexColor(catMap[key]?.colorHex ?: colorHex))
                             )
                         }
                     }
@@ -463,7 +477,7 @@ fun GroupedCategoryMonthChart(
 }
 
 /**
- * 6. Horizontal Bar Chart for Top Spending Categories
+ * 6. Horizontal Bar Chart for Top Expense Amounts
  */
 @Composable
 fun TopCategoriesHorizontalBarChart(
@@ -472,7 +486,7 @@ fun TopCategoriesHorizontalBarChart(
     modifier: Modifier = Modifier
 ) {
     if (items.isEmpty()) {
-        EmptyChartPlaceholder("No category ranking data available.")
+        EmptyChartPlaceholder("Add an expense amount to view ranking.")
         return
     }
     val maxVal = items.first().totalMinor.coerceAtLeast(1L)
@@ -589,7 +603,7 @@ fun CalendarSpendingHeatmap(
 }
 
 /**
- * 8. Stacked Bar Chart for Category-Wise Monthly Spending
+ * 8. Stacked Bar Chart for Monthly Expense Amounts
  */
 @Composable
 fun MonthlyStackedCategoryChart(
@@ -599,7 +613,7 @@ fun MonthlyStackedCategoryChart(
     modifier: Modifier = Modifier
 ) {
     if (monthlyItems.isEmpty()) {
-        EmptyChartPlaceholder("No monthly category data to stack.")
+        EmptyChartPlaceholder("Add expense amounts to view monthly stacked visualization.")
         return
     }
     val catMap = categories.associateBy { it.id }
@@ -621,9 +635,9 @@ fun MonthlyStackedCategoryChart(
                         .clip(RoundedCornerShape(7.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    m.byCategoryMinor.entries.sortedByDescending { it.value }.forEach { (catId, amt) ->
+                    m.byCategoryMinor.entries.sortedByDescending { it.value }.forEachIndexed { idx, (catId, amt) ->
                         val weight = (amt.toFloat() / total.toFloat()).coerceAtLeast(0.02f)
-                        val colorHex = catMap[catId]?.colorHex ?: "#10B981"
+                        val colorHex = catMap[catId]?.colorHex ?: com.example.domain.FinancialCalculator.colorForKey(catId, idx)
                         Box(
                             modifier = Modifier
                                 .weight(weight)

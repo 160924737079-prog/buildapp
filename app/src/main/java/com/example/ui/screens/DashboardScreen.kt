@@ -1,7 +1,6 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,14 +55,17 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.data.ExpenseEntity
 import com.example.domain.CurrencyOption
 import com.example.domain.DateRangeEngine
+import com.example.domain.FinancialCalculator
 import com.example.domain.MoneyUtils
 import com.example.domain.PaymentMethod
 import com.example.ui.AppPage
 import com.example.ui.ExpenseProUiState
 import com.example.ui.ExpenseProViewModel
 import com.example.ui.components.CategoryDonutChart
+import com.example.ui.components.CategoryVerticalBarChart
 import com.example.ui.components.DailyTrendLineChart
 import com.example.ui.theme.AlertRed600
 import com.example.ui.theme.Emerald500
@@ -98,26 +100,60 @@ fun DashboardScreen(
         }
     }
 
-    val metrics = uiState.dashboardMetrics
     val currency = uiState.currencyCode
     val currencySymbol = CurrencyOption.fromCode(currency).symbol
     val activeDateIso = uiState.referenceDateIso
     val systemTodayIso = DateRangeEngine.todayIso(uiState.profile?.timezone ?: "Asia/Kolkata")
     val isToday = activeDateIso == systemTodayIso
 
-    val topCategories = uiState.categories.filter { it.parentCategoryId == null && !it.isArchived }
-    var expenseTitle by remember { mutableStateOf("") }
     var expenseAmount by remember { mutableStateOf("") }
+    var expenseTitle by remember { mutableStateOf("") }
     // Automatically updates the form's date whenever the active day changes
     var expenseDateInput by remember(activeDateIso) { mutableStateOf(activeDateIso) }
-    var selectedCategoryId by remember(topCategories.size) {
-        mutableStateOf(topCategories.firstOrNull()?.id.orEmpty())
-    }
-    var selectedPaymentMethod by remember { mutableStateOf(PaymentMethod.UPI.label) }
     var showOnlyActiveDayExpenses by remember { mutableStateOf(false) }
 
+    // Live preview expense when user enters an amount in Add Expense
+    val typedAmountMinor = MoneyUtils.toMinorUnits(expenseAmount)
+    val effectiveDateForPreview = if (DateRangeEngine.isValidIsoDate(expenseDateInput.trim())) {
+        expenseDateInput.trim()
+    } else {
+        activeDateIso
+    }
+    val previewExpense = if (typedAmountMinor != null && typedAmountMinor > 0L) {
+        val previewLabel = expenseTitle.trim().ifEmpty {
+            "Draft (${MoneyUtils.formatMoney(typedAmountMinor, currency)})"
+        }
+        ExpenseEntity(
+            id = "live_draft_preview",
+            userId = uiState.session.userId,
+            categoryId = "exp_live_draft_preview",
+            title = previewLabel,
+            amountMinor = typedAmountMinor,
+            currency = currency,
+            expenseDateIso = effectiveDateForPreview,
+            paymentMethod = PaymentMethod.UPI.label
+        )
+    } else null
+
+    val expensesWithLiveAmount = if (previewExpense != null) {
+        listOf(previewExpense) + uiState.expenses
+    } else {
+        uiState.expenses
+    }
+
+    val liveMetrics = FinancialCalculator.computeDashboardMetrics(
+        allExpenses = expensesWithLiveAmount,
+        categories = emptyList(),
+        period = uiState.globalPeriod,
+        referenceDateIso = activeDateIso,
+        overallMonthlyBudgetMinor = uiState.profile?.overallMonthlyBudgetMinor ?: 50_000_00L,
+        customStartIso = uiState.customStartDateIso,
+        customEndIso = uiState.customEndDateIso
+    )
+
     val selectedDayExpenses = uiState.expenses.filter { it.expenseDateIso == activeDateIso }
-    val selectedDayTotalMinor = selectedDayExpenses.sumOf { it.amountMinor }
+    val selectedDayTotalMinor = selectedDayExpenses.sumOf { it.amountMinor } +
+        (if (previewExpense?.expenseDateIso == activeDateIso) previewExpense.amountMinor else 0L)
 
     val displayedExpenses = if (showOnlyActiveDayExpenses) {
         selectedDayExpenses
@@ -132,7 +168,7 @@ fun DashboardScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. Live Date Selector & Clean Totals Header (No Average Daily, No Clutter)
+        // 1. Live Date Selector & Clean Totals Header
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -212,7 +248,7 @@ fun DashboardScreen(
                     }
                 }
 
-                // Clean 2-Card Summary Row: Selected Day Total & This Month Total (Removed Average Daily)
+                // Clean 2-Card Summary Row: Selected Day Total & This Month Total
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -255,7 +291,7 @@ fun DashboardScreen(
                                 color = Color(0xFFCBD5E1)
                             )
                             Text(
-                                text = MoneyUtils.formatMoney(metrics.thisMonthExpensesMinor, currency),
+                                text = MoneyUtils.formatMoney(liveMetrics.thisMonthExpensesMinor, currency),
                                 style = MaterialTheme.typography.titleLarge,
                                 fontFamily = JetBrainsMonoFamily,
                                 fontWeight = FontWeight.Bold,
@@ -272,7 +308,7 @@ fun DashboardScreen(
             }
         }
 
-        // 2. Simple Add Expense Card
+        // 2. Simple Add Expense Card (Amount-First, No Preset Categories)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -288,18 +324,16 @@ fun DashboardScreen(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
+                Text(
+                    text = "Enter an expense amount below — visualizations are generated automatically from your amounts.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    OutlinedTextField(
-                        value = expenseTitle,
-                        onValueChange = { expenseTitle = it },
-                        label = { Text("Item Name (e.g. Milk, Groceries)") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1.3f).testTag("dashboard_instant_title_input")
-                    )
                     OutlinedTextField(
                         value = expenseAmount,
                         onValueChange = { expenseAmount = it },
@@ -308,26 +342,16 @@ fun DashboardScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f).testTag("dashboard_instant_amount_input")
                     )
+                    OutlinedTextField(
+                        value = expenseTitle,
+                        onValueChange = { expenseTitle = it },
+                        label = { Text("Note / Label (Optional)") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1.2f).testTag("dashboard_instant_title_input")
+                    )
                 }
 
-                // Category Chips
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    topCategories.forEach { cat ->
-                        val activeCatId = selectedCategoryId.ifEmpty { topCategories.firstOrNull()?.id.orEmpty() }
-                        FilterChip(
-                            selected = activeCatId == cat.id,
-                            onClick = { selectedCategoryId = cat.id },
-                            label = { Text(cat.name) },
-                            modifier = Modifier.testTag("dashboard_cat_chip_${cat.name.lowercase().replace(" ", "_")}")
-                        )
-                    }
-                }
-
-                // Date & Payment Method + Add Button
+                // Date + Add Expense Button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -348,8 +372,6 @@ fun DashboardScreen(
 
                     Button(
                         onClick = {
-                            val targetCatId = selectedCategoryId.ifEmpty { topCategories.firstOrNull()?.id.orEmpty() }
-                            val firstSubId = uiState.categories.firstOrNull { it.parentCategoryId == targetCatId }?.id
                             val validDate = if (DateRangeEngine.isValidIsoDate(expenseDateInput.trim())) {
                                 expenseDateInput.trim()
                             } else {
@@ -358,10 +380,10 @@ fun DashboardScreen(
                             viewModel.saveExpense(
                                 title = expenseTitle,
                                 amountText = expenseAmount,
-                                categoryId = targetCatId,
-                                subcategoryId = firstSubId,
+                                categoryId = "",
+                                subcategoryId = null,
                                 expenseDateIso = validDate,
-                                paymentMethod = selectedPaymentMethod,
+                                paymentMethod = PaymentMethod.UPI.label,
                                 merchant = "",
                                 description = "",
                                 notes = "",
@@ -384,7 +406,88 @@ fun DashboardScreen(
             }
         }
 
-        // 3. Direct Expense List with 1-Tap Delete (Replaces Recent Transactions & Complex History)
+        // 3. Visualizations Generated Directly from Expense Amounts
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Expense Amount Visualization (Donut)",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    TextButton(
+                        onClick = { viewModel.navigateTo(AppPage.REPORTS) },
+                        modifier = Modifier.testTag("dashboard_view_charts_button")
+                    ) {
+                        Icon(Icons.Default.Analytics, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("More Charts →")
+                    }
+                }
+                CategoryDonutChart(
+                    items = liveMetrics.categoryBreakdown,
+                    currencyCode = currency
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Expense Amount Comparison (Bar Chart)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                CategoryVerticalBarChart(
+                    items = liveMetrics.categoryBreakdown,
+                    currencyCode = currency
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Day-by-Day Spending Visualization",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                DailyTrendLineChart(
+                    dailyItems = liveMetrics.dailyTrend,
+                    currencyCode = currency
+                )
+            }
+        }
+
+        // 4. Direct Expense List with 1-Tap Delete
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -422,18 +525,16 @@ fun DashboardScreen(
                     }
                 }
 
-                val catMap = uiState.categories.associateBy { it.id }
-
                 if (displayedExpenses.isEmpty()) {
                     Text(
-                        text = "No expenses recorded yet. Enter an item and amount above and tap 'Add Expense'.",
+                        text = "No expenses recorded yet. Enter an amount in Add Expense above and tap 'Add Expense'.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 12.dp)
                     )
                 } else {
-                    displayedExpenses.forEach { tx ->
-                        val cat = catMap[tx.categoryId]
+                    displayedExpenses.forEachIndexed { idx, tx ->
+                        val itemColorHex = FinancialCalculator.colorForKey(tx.categoryId.ifBlank { tx.id }, idx)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -453,13 +554,13 @@ fun DashboardScreen(
                                     modifier = Modifier
                                         .size(34.dp)
                                         .clip(CircleShape)
-                                        .background(parseHexColor(cat?.colorHex ?: "#10B981").copy(alpha = 0.18f)),
+                                        .background(parseHexColor(itemColorHex).copy(alpha = 0.18f)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = (cat?.name ?: "E").take(1).uppercase(),
+                                        text = currencySymbol,
                                         style = MaterialTheme.typography.titleSmall,
-                                        color = parseHexColor(cat?.colorHex ?: "#10B981"),
+                                        color = parseHexColor(itemColorHex),
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -472,7 +573,7 @@ fun DashboardScreen(
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = "${cat?.name ?: "Expense"} • ${DateRangeEngine.formatDisplayDate(tx.expenseDateIso, uiState.dateFormatPattern)}",
+                                        text = DateRangeEngine.formatDisplayDate(tx.expenseDateIso, uiState.dateFormatPattern),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1
@@ -505,65 +606,6 @@ fun DashboardScreen(
                         }
                     }
                 }
-            }
-        }
-
-        // 4. Clean Spending Visualizations
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Category Spending Visualization",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    TextButton(
-                        onClick = { viewModel.navigateTo(AppPage.REPORTS) },
-                        modifier = Modifier.testTag("dashboard_view_charts_button")
-                    ) {
-                        Icon(Icons.Default.Analytics, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("More Charts →")
-                    }
-                }
-                CategoryDonutChart(
-                    items = metrics.categoryBreakdown,
-                    currencyCode = currency
-                )
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "Day-by-Day Spending Visualization",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                DailyTrendLineChart(
-                    dailyItems = metrics.dailyTrend,
-                    currencyCode = currency
-                )
             }
         }
     }
